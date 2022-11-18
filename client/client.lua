@@ -61,7 +61,8 @@ local function isInsideZone(type, entity)
 end
 
 local function ImpoundBlips(coords, type, label, blipOptions)
-    local blip = AddBlipForCoord(coords)
+    if blipOptions == false then return end
+    local blip = AddBlipForCoord(coords.x, coords.y, coords.z)
     SetBlipSprite(blip, blipOptions?.sprite or 285)
     SetBlipScale(blip, blipOptions?.scale or 0.8)
     SetBlipColour(blip, blipOptions?.colour and blipOptions.colour or type == 'car' and Config.BlipColors.Car or type == 'boat' and Config.BlipColors.Boat or Config.BlipColors.Aircraft)
@@ -72,8 +73,9 @@ local function ImpoundBlips(coords, type, label, blipOptions)
 end
 
 local function GarageBlips(coords, type, label, job, blipOptions)
+    if blipOptions == false then return end
     if job then return end
-    local blip = AddBlipForCoord(coords)
+    local blip = AddBlipForCoord(coords.x, coords.y, coords.z)
     SetBlipSprite(blip, blipOptions?.sprite or 357)
     SetBlipScale(blip, blipOptions?.scale or 0.8)
     SetBlipColour(blip, blipOptions?.colour ~= nil and blipOptions.colour or type == 'car' and Config.BlipColors.Car or type == 'boat' and Config.BlipColors.Boat or Config.BlipColors.Aircraft)
@@ -96,24 +98,47 @@ local function JobGarageBlip(garage)
     EndTextCommandSetBlipName(jobBlips[index])
 end
 
-exports['qtarget']:Vehicle({
-	options = {
-		{
-			event = 'luke_garages:StoreVehicle',
-			label = Locale('store_vehicle'),
-			icon = 'fas fa-parking',
+
+if Config.ox_target then
+    exports.ox_target:addGlobalVehicle({
+        {
+            name = 'open_parking',
+            icon = 'fa-solid fa-parking',
+            label = Locale('store_vehicle'),
+            event = 'luke_garages:StoreVehicle',
             canInteract = function(entity)
                 hasChecked = false
                 if isInsideZone('garage', entity) and not hasChecked then
                     hasChecked = true
                     return true
                 end
-            end
-		}
-	},
-	distance = 2.5
-})
+            end,
+            distance = 2.5
+        }
+    })
+else
+    exports['qtarget']:Vehicle({
+        options = {
+            {
+                event = 'luke_garages:StoreVehicle',
+                label = Locale('store_vehicle'),
+                icon = 'fas fa-parking',
+                canInteract = function(entity)
+                    hasChecked = false
+                    if isInsideZone('garage', entity) and not hasChecked then
+                        hasChecked = true
+                        return true
+                    end
+                end
+            }
+        },
+        distance = 2.5
+    })
+end
 
+local garagePeds = {
+    [Config.DefaultGaragePed] = true,
+}
 for k, v in pairs(Config.Garages) do
 
     GarageBlips(vector3(v.pedCoords.x, v.pedCoords.y, v.pedCoords.z), v.type, v.label, v.job, v.blip)
@@ -132,24 +157,30 @@ for k, v in pairs(Config.Garages) do
     garages[k].type = v.type
     garages[k].label = v.label
 
-    exports['qtarget']:AddTargetModel({v.ped or Config.DefaultGaragePed}, {
-        options = {
-            {
-                event = "luke_garages:GetOwnedVehicles",
-                icon = "fas fa-warehouse",
-                label = Locale('take_out_vehicle'),
-                job = v.job or nil,
-                canInteract = function(entity)
-                    hasChecked = false
-                    if isInsideZone('garage', entity) and not hasChecked then
-                        hasChecked = true
-                        return true
+    if not Config.ox_target then
+        exports['qtarget']:AddTargetModel({v.ped or Config.DefaultGaragePed}, {
+            options = {
+                {
+                    event = "luke_garages:GetOwnedVehicles",
+                    icon = "fas fa-warehouse",
+                    label = Locale('take_out_vehicle'),
+                    job = v.job or nil,
+                    canInteract = function(entity)
+                        hasChecked = false
+                        if isInsideZone('garage', entity) and not hasChecked then
+                            hasChecked = true
+                            return true
+                        end
                     end
-                end
+                },
             },
-        },
-        distance = 2.5,
-    })
+            distance = 2.5,
+        })
+    else
+        if v.ped then
+            garagePeds[v.ped] = true
+        end
+    end
 
     garages[k]:onPlayerInOut(function(isPointInside, point)
         local model = v.ped or Config.DefaultGaragePed
@@ -176,7 +207,40 @@ for k, v in pairs(Config.Garages) do
     end)
 end
 
-local impoundPeds = {Config.DefaultImpoundPed}
+if Config.ox_target then
+    local pedsArr = {}
+    for ped, _ in pairs(garagePeds) do pedsArr[#pedsArr+1] = ped end
+    exports.ox_target:addModel(pedsArr, {
+        {
+            name = 'open_garage',
+            icon = 'fa-solid fa-warehouse',
+            label = Locale('take_out_vehicle'),
+            event = 'luke_garages:GetOwnedVehicles',
+            canInteract = function(entity)
+                hasChecked = false
+                if isInsideZone('garage', entity) and not hasChecked then
+                    hasChecked = true
+                    local requiredGroup = currentGarage.job
+                    local playerJob = ESX.PlayerData.job
+                    if not requiredGroup then return true end
+                    if type(requiredGroup) == 'string' then
+                        if not requiredGroup == playerJob.name then return false end
+                    else
+                        for job, grade in pairs(requiredGroup) do
+                            if playerJob.name == job and playerJob.grade >= grade then return true end
+                        end
+                        return false
+                    end
+                end
+            end,
+            distance = 2.5
+        }
+    })
+end
+
+local impoundPeds = {
+    [Config.DefaultImpoundPed] = true
+}
 for k, v in pairs(Config.Impounds) do
 
     ImpoundBlips(vector3(v.pedCoords.x, v.pedCoords.y, v.pedCoords.z), v.type, v.label, v.blip)
@@ -194,7 +258,9 @@ for k, v in pairs(Config.Impounds) do
 
     impounds[k].type = v.type
 
-    impoundPeds[#impoundPeds+1] = v.ped
+    if v.ped then
+        impoundPeds[v.ped] = true
+    end
 
     impounds[k]:onPlayerInOut(function(isPointInside, point)
         local model = v.ped or Config.DefaultImpoundPed
@@ -221,23 +287,46 @@ for k, v in pairs(Config.Impounds) do
     end)
 end
 
-exports['qtarget']:AddTargetModel(impoundPeds, {
-    options = {
+if Config.ox_target then
+    local pedsArr = {}
+    for ped, _ in pairs(impoundPeds) do
+        pedsArr[#pedsArr+1] = ped
+    end
+    exports.ox_target:addModel(pedsArr, {
         {
-            event = 'luke_garages:GetImpoundedVehicles',
-            icon = "fas fa-key",
+            name = 'open_impound',
+            icon = 'fa-solid fa-key',
             label = Locale('access_impound'),
+            event = 'luke_garages:GetImpoundedVehicles',
             canInteract = function(entity)
                 hasChecked = false
                 if isInsideZone('impound', entity) and not hasChecked then
                     hasChecked = true
                     return true
                 end
-            end
+            end,
+            distance = 2.5
+        }
+    })
+else
+    exports['qtarget']:AddTargetModel(impoundPeds, {
+        options = {
+            {
+                event = 'luke_garages:GetImpoundedVehicles',
+                icon = "fas fa-key",
+                label = Locale('access_impound'),
+                canInteract = function(entity)
+                    hasChecked = false
+                    if isInsideZone('impound', entity) and not hasChecked then
+                        hasChecked = true
+                        return true
+                    end
+                end
+            },
         },
-    },
-    distance = 2.5,
-})
+        distance = 2.5,
+    })
+end
 
 AddStateBagChangeHandler('vehicleData', nil, function(bagName, key, value, _unused, replicated)
     if not value then return end
@@ -429,6 +518,18 @@ end)
 RegisterNetEvent('esx:setJob', function(job)
     for i = 1, #jobBlips do RemoveBlip(jobBlips[i]) end
     for i = 1, #Config.Garages do
-        if Config.Garages[i].job == job.name then JobGarageBlip(Config.Garages[i]) end
+        local garage = Config.Garages[i]
+        if garage.job then
+            if type(garage.job) == 'string' then
+                if garage.job == job.name then JobGarageBlip(garage) end
+            else
+                for jobName, _ in pairs(garage.job) do
+                    if jobName == job.name then
+                        JobGarageBlip(garage)
+                        break
+                    end
+                end
+            end
+        end
     end
 end)

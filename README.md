@@ -1,5 +1,7 @@
 # luke_garages
 
+## Due to the lack of time and motivation to fix the currently ongoing issues and implement new features the work on the repository is suspended.
+
 This resource only supports ESX Legacy, other versions of the framework **will not** work without modifying the resource.
 
 Alongside cars, aircrafts and boats are also fully supported with them having their own separate garages and impounds.
@@ -13,7 +15,7 @@ I used esx_vehicleshop, but the resource should work with anything that follows 
 ### Dependencies
 
 - [PolyZone](https://github.com/mkafrin/PolyZone)
-- [qtarget](https://github.com/overextended/qtarget)
+- [ox_target](https://github.com/overextended/ox_target) (recommended) or [qtarget](https://github.com/overextended/qtarget) (deprecated)
 - [ox_lib](https://github.com/overextended/ox_lib)
 - Server game build 1868 or newer\*
 
@@ -56,6 +58,7 @@ Depending on the game build number you choose is the GTA DLC your server is goin
 2189 - Cayo Perico Heist
 2373 - Tuners update
 2545 - The Contract update
+2699 - Criminal Enterprises update
 ```
 ## License
 

@@ -6,7 +6,7 @@ lua54 'yes'
 
 author 'Luke - https://www.github.com/lukewastakenn'
 
-version '2.7.2'
+version '2.10.0'
 
 dependencies { 
     '/server:5104',
@@ -27,8 +27,7 @@ client_scripts {
     '@PolyZone/BoxZone.lua',
     '@PolyZone/CircleZone.lua',
     'client/vehicle_names.lua',
-    'client/client.lua',
-    'client/vehicle_functions.lua'
+    'client/client.lua'
 }
 
 server_scripts {
